@@ -42,19 +42,11 @@ const NotesPage = ({ navigation, route }) => {
 
   async function saveNotes() {
     try {
-      addDoc(collection(database, "notes"), {
+addDoc(collection(database, "notes"), {
         text: userInput
       })
     } catch (error) {
       Alert.alert("Failed to save notes!");
-    }
-  }
-
-  async function clearNotes() {
-    try {
-      await AsyncStorage.removeItem("@notes");
-    } catch (error) {
-      Alert.alert("Failed to clear notes!");
     }
   }
 
