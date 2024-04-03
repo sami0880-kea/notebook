@@ -8,30 +8,147 @@ import { app, database, storage } from './Firebase'
 import { doc, updateDoc, deleteDoc, collection, addDoc } from 'firebase/firestore'
 import { useCollection } from 'react-firebase-hooks/firestore'
 import { ref, uploadBytes, listAll, getDownloadURL, deleteObject } from 'firebase/storage'; 
+import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'; 
 
+const auth = getAuth(app);
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="NotesPage">
-        <Stack.Screen name="Notes" component={NotesPage} />
+      <Stack.Navigator initialRouteName="LoginPage">
+        <Stack.Screen name="Login" component={LoginPage} options={{ headerBackVisible: false}}/>
+        <Stack.Screen name="Signup" component={SignupPage} options={{ headerBackVisible: false }}/>
+        <Stack.Screen name="Notes" component={NotesPage} options={{ headerBackVisible: false }}/>
         <Stack.Screen name="DetailsPage" component={DetailsPage} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
 
+const LoginPage = ({ navigation, route }) => {
+  const [emailInput, setEmailInput] = useState("admin@test.com");
+  const [passwordInput, setPasswordInput] = useState("Test123");
+
+  /* useEffect(() => {  
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if(currentUser) {
+        setUserId(currentUser.uid)
+      } else {
+        setUserId(null)
+      }
+    })
+    return () => unsubscribe()  
+  }, []) */
+  
+  async function login() {
+    try {
+      const userCredentials = await signInWithEmailAndPassword(auth, emailInput, passwordInput)
+      if(userCredentials) {
+        const userId = userCredentials.user.uid
+        navigation.navigate('Notes', { userId });
+        console.log(userId)
+      }
+    } catch(e) {
+      Alert.alert("Login failed!")
+    }
+  }
+
+  function SwitchSignupPage() {
+    navigation.navigate('Signup' )
+  }
+
+  return (
+    <View style={styles.main}>
+      <Text style={styles.title}>Notebook App</Text>
+      <Text>by Samim S.</Text>
+
+      <TextInput
+        style={styles.textInput}
+        placeholder='Email'
+        onChangeText={text => setEmailInput(text)}
+        value={emailInput}
+      />
+      <TextInput
+        style={styles.textInput}
+        placeholder='Password'
+        onChangeText={text => setPasswordInput(text)}
+        value={passwordInput}
+      />
+      <Button
+        title='Login'
+        onPress={login}
+      />
+      <Button
+        title='or Signup'
+        onPress={SwitchSignupPage}
+      />
+    </View>
+  );
+}
+
+const SignupPage = ({ navigation, route }) => {
+  const [emailInput, setEmailInput] = useState("admin@test.com");
+  const [passwordInput, setPasswordInput] = useState("Test123");
+
+  async function signup() {
+    try {
+      const userCredentials = await createUserWithEmailAndPassword(auth, emailInput, passwordInput);
+      if(userCredentials) {
+        const userId = userCredentials.user.uid
+        navigation.navigate('Notes', { userId });
+        console.log(userId)
+      }
+    } catch(e) {
+      Alert.alert("Login failed!")
+    }
+  }
+
+  function SwitchLoginPage() {
+    navigation.navigate('Login')
+  }
+
+  return (
+    <View style={styles.main}>
+      <Text style={styles.title}>Notebook App</Text>
+      <Text>by Samim S.</Text>
+
+      <TextInput
+        style={styles.textInput}
+        placeholder='Email'
+        onChangeText={text => setEmailInput(text)}
+        value={emailInput}
+      />
+      <TextInput
+        style={styles.textInput}
+        placeholder='Password'
+        onChangeText={text => setPasswordInput(text)}
+        value={passwordInput}
+      />
+      <Button
+        title='Signup'
+        onPress={signup}
+      />
+      <Button
+        title='or Login'
+        onPress={SwitchLoginPage}
+      />
+    </View>
+  );
+}
+
+
 const NotesPage = ({ navigation, route }) => {
   const [userInput, setUserInput] = useState("");
-  const [values, loading, error] = useCollection(collection(database, "notes"))
+  const [userId] = useState(route?.params?.userId)
+  const [values, loading, error] = useCollection(collection(database, userId))
   const data = values?.docs.map((doc) => ({...doc.data(), id: doc.id}))
   
   useEffect(() => {
     const updatedNote = route?.params?.updatedNote;
     if (updatedNote) {
-      const noteRef = doc(database, "notes", updatedNote.id);
+      const noteRef = doc(database, userId, updatedNote.id);
       updateDoc(noteRef, {
         text: updatedNote.text
       }).catch(error => {
@@ -43,7 +160,7 @@ const NotesPage = ({ navigation, route }) => {
   
   async function saveNotes() {
     try {
-      addDoc(collection(database, "notes"), {
+      addDoc(collection(database, userId), {
         text: userInput
       })
     } catch (error) {
@@ -60,8 +177,13 @@ const NotesPage = ({ navigation, route }) => {
     }
   }
 
+  async function signout() {
+    signOut(auth)
+    navigation.navigate('Login');
+  }
+
   function handleButton(note) {
-    navigation.navigate('DetailsPage', { note });
+    navigation.navigate('DetailsPage', { note, userId });
   }
 
   return (
@@ -76,6 +198,11 @@ const NotesPage = ({ navigation, route }) => {
             <FontAwesome name="plus" size={24} color="white" />
           </TouchableOpacity>
         </View>
+        <Button
+          title='Sign out'
+          style={styles.signoutButton}
+          onPress={signout}
+        />
       </View>
       <FlatList
         data={data}
@@ -90,13 +217,16 @@ const NotesPage = ({ navigation, route }) => {
         )}
         style={styles.noteList}
       />
+
     </View>
+   
   );
 }
 
 const DetailsPage = ({ navigation, route }) => {
   const [images, setImages] = useState([]);
   const [editedMessage, setEditedMessage] = useState(route.params?.note.text);
+  const [userId, setUserId] = useState(route?.params?.userId)
 
   useEffect(() => {
     getImages()
@@ -117,7 +247,7 @@ const DetailsPage = ({ navigation, route }) => {
         })
       }
     } catch (error) {
-      Alert.alert("Failed to launhc camera");
+      Alert.alert("Failed to launch camera");
     }
   }
 // 
@@ -130,7 +260,7 @@ const DetailsPage = ({ navigation, route }) => {
   const deleteNote = async () => {
     const noteId = route.params.note.id;
     try {
-      await deleteDoc(doc(database, "notes", noteId));
+      await deleteDoc(doc(database, userId, noteId));
       Alert.alert("Note deleted!");
       navigation.goBack();
     } catch (error) {
@@ -274,5 +404,10 @@ const styles = StyleSheet.create({
     width: 250,
     height: 200,
     borderRadius: 8,
+  },
+  signoutButton: {
+    backgroundColor: '#2cabff',
+    padding: 5,
+    marginBottom: 30
   }
 });
