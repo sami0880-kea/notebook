@@ -9,9 +9,10 @@ import { doc, updateDoc, deleteDoc, collection, addDoc } from 'firebase/firestor
 import { useCollection } from 'react-firebase-hooks/firestore'
 import { ref, uploadBytes, listAll, getDownloadURL, deleteObject } from 'firebase/storage'; 
 import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'; 
+import * as Notifications from 'expo-notifications';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const auth = getAuth(app);
-
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -48,7 +49,6 @@ const LoginPage = ({ navigation, route }) => {
       if(userCredentials) {
         const userId = userCredentials.user.uid
         navigation.navigate('Notes', { userId });
-        console.log(userId)
       }
     } catch(e) {
       Alert.alert("Login failed!")
@@ -98,7 +98,6 @@ const SignupPage = ({ navigation, route }) => {
       if(userCredentials) {
         const userId = userCredentials.user.uid
         navigation.navigate('Notes', { userId });
-        console.log(userId)
       }
     } catch(e) {
       Alert.alert("Login failed!")
@@ -144,7 +143,39 @@ const NotesPage = ({ navigation, route }) => {
   const [userId] = useState(route?.params?.userId)
   const [values, loading, error] = useCollection(collection(database, userId))
   const data = values?.docs.map((doc) => ({...doc.data(), id: doc.id}))
+  const [date, setDate] = useState(new Date());
+
+  const onChange = (event, selectedDate) => {
+    const currentDate = selectedDate || date;
+    setDate(currentDate);
+    console.log(currentDate)
+    scheduleNotification(currentDate);
+  };
+
+  const scheduleNotification = async (date) => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Note Reminder!",
+        body: userInput, 
+      },
+      trigger: date,
+    });
+  };
   
+  useEffect(() => {
+    async function registerForPushNotificationsAsync() {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Notification access denied!');
+        return;
+      }
+      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      return token;
+    }
+    
+    registerForPushNotificationsAsync();
+  }, []);
+
   useEffect(() => {
     const updatedNote = route?.params?.updatedNote;
     if (updatedNote) {
@@ -198,6 +229,21 @@ const NotesPage = ({ navigation, route }) => {
             <FontAwesome name="plus" size={24} color="white" />
           </TouchableOpacity>
         </View>
+        <View style={styles.iconContainer}>
+          <DateTimePicker
+            value={date}
+            mode={'date'}
+            is24Hour={true}
+            onChange={onChange}
+          />
+          <DateTimePicker
+            value={date}
+            mode={'time'}
+            is24Hour={true}
+            onChange={onChange}
+          />
+        </View>
+
         <Button
           title='Sign out'
           style={styles.signoutButton}
@@ -242,7 +288,6 @@ const DetailsPage = ({ navigation, route }) => {
 
         }).then((response) => {
           const imageResult = response.assets[0].uri
-          console.log("Uploading image -> " + response)
           uploadImage(imageResult)
         })
       }
