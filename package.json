@@ -29,7 +29,9 @@
     "react-native-vector-icons": "^10.0.3",
     "react-native-web": "~0.19.6",
     "expo-notifications": "~0.27.6",
-    "undefined": "react-native-async-storage/async-storage"
+    "undefined": "react-native-async-storage/async-storage",
+    "react-native-gesture-handler": "~2.14.0",
+    "react-native-reanimated": "~3.6.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

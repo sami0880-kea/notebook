@@ -11,7 +11,14 @@ import { ref, uploadBytes, listAll, getDownloadURL, deleteObject } from 'firebas
 import { createUserWithEmailAndPassword, getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth'; 
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  runOnJS,
+  withSpring,
+ } from 'react-native-reanimated';
+ import {PanGestureHandler, GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
+ 
 const auth = getAuth(app);
 const Stack = createNativeStackNavigator();
 
@@ -136,7 +143,6 @@ const SignupPage = ({ navigation, route }) => {
     </View>
   );
 }
-
 
 const NotesPage = ({ navigation, route }) => {
   const [userInput, setUserInput] = useState("");
@@ -263,9 +269,7 @@ const NotesPage = ({ navigation, route }) => {
         )}
         style={styles.noteList}
       />
-
     </View>
-   
   );
 }
 
@@ -295,7 +299,7 @@ const DetailsPage = ({ navigation, route }) => {
       Alert.alert("Failed to launch camera");
     }
   }
-// 
+
   const saveNote = () => {
     uploadImage()
     const updatedNote = { ...route.params.note, text: editedMessage };
@@ -369,19 +373,56 @@ const DetailsPage = ({ navigation, route }) => {
         <TouchableOpacity style={styles.iconButton} onPress={launchCamera}><FontAwesome name="camera" size={24} color="white" /></TouchableOpacity>
         <TouchableOpacity style={styles.iconButton} onPress={deleteNote}><FontAwesome name="trash" size={24} color="white" /></TouchableOpacity>
       </View>
+      <Text style={{ textAlign: 'center', padding: 10}}>Swipe to delete</Text>
       <ScrollView>
+        <GestureHandlerRootView>
         {images.map((imageUri, index) => (
           <View key={index} style={styles.noteImagesContainer}>
-            <Image source={{ uri: imageUri }} style={styles.noteImage} />
-            <TouchableOpacity style={styles.iconButton} onPress={() => deleteImage(imageUri)}>
-              <FontAwesome name="trash" size={24} color="white" />
-            </TouchableOpacity>
+            <ImageCard image={imageUri} onSwipeOff={deleteImage}/>
           </View>
         ))}
+        </GestureHandlerRootView>
       </ScrollView>    
       </View>
   );
 };
+
+const ImageCard = ({ image, onSwipeOff }) => {
+  const translateX = useSharedValue(0);
+
+ const panGesture = Gesture.Pan()
+   .onUpdate((event) => {
+    //console.log("update", translateX.value)
+    if(event.translationX < 0) {
+      translateX.value = event.translationX;
+    }
+   })
+   .onEnd(() => {
+    //console.log("end", translateX.value)
+    translateX.value = withSpring(0);
+    if(translateX.value < -100) {
+      translateX.value = withSpring(-500);
+      runOnJS(onSwipeOff)(image)
+    }
+   });
+
+
+ const animatedStyle = useAnimatedStyle(() => {
+   return {
+     transform: [
+       { translateX: translateX.value }
+     ],
+   };
+ });
+
+  return (
+    <GestureDetector gesture={panGesture}>
+       <Animated.View style={[animatedStyle]}>
+        <Image source={{ uri: image }} style={styles.noteImage} />
+      </Animated.View>
+    </GestureDetector>
+  )
+}
 
 const styles = StyleSheet.create({
   container: {
